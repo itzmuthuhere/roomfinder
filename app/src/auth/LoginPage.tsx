@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { ApiError } from '../lib/api'
-import { requestOtp, verifyOtp, type AuthedUser } from '../lib/auth'
+import { requestOtp, verifyOtp, type AuthedUser, type Role } from '../lib/auth'
 
-/** Phone -> OTP -> signed in. Always signs up new numbers as OWNER; this is the owner app for now. */
-export function LoginPage({ onSignedIn }: { onSignedIn: (user: AuthedUser) => void }) {
+/**
+ * Phone -> OTP -> signed in. `role` is only used the first time this phone number ever logs in
+ * (the server ignores it for a returning number) - see auth's OtpService for why.
+ */
+export function LoginPage({ role, onSignedIn }: { role: Role; onSignedIn: (user: AuthedUser) => void }) {
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [stage, setStage] = useState<'phone' | 'code'>('phone')
@@ -15,7 +18,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (user: AuthedUser) => vo
     setError(null)
     setBusy(true)
     try {
-      await requestOtp(phone, 'OWNER')
+      await requestOtp(phone, role)
       setStage('code')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err))
@@ -41,7 +44,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: (user: AuthedUser) => vo
   if (stage === 'phone') {
     return (
       <form className="card" onSubmit={sendCode}>
-        <h3>Owner sign in</h3>
+        <h3>{role === 'OWNER' ? 'Owner sign in' : 'Sign in'}</h3>
         {error && <p className="bad">{error}</p>}
         <label className="field">
           <span>Mobile number</span>

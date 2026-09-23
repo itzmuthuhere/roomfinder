@@ -30,8 +30,8 @@ public class BedService {
 	}
 
 	/**
-	 * Moves a bed to a new state. Rejects transitions the state machine does not allow,
-	 * and loses gracefully if someone else changed the bed first.
+	 * Moves a bed to a new state on the owner's own say-so (the bed grid). Rejects transitions the
+	 * state machine does not allow, and loses gracefully if someone else changed the bed first.
 	 */
 	@Transactional
 	public BedState changeState(AuthedUser user, long bedId, BedState next, String reason, LocalDate availableFrom) {
@@ -41,11 +41,38 @@ public class BedService {
 		long ownerId = pgs.ownerIdOf(pgId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BED_NOT_FOUND", "No such bed"));
 		authed.requireOwnerOf(ownerId);
 
+		return performTransition(bedId, next, reason, availableFrom, authed.id());
+	}
+
+	/**
+	 * A seeker holds the bed themselves when requesting a visit - this is not an owner action, so
+	 * it does not go through {@link #changeState}'s ownership check. It is still exactly the same
+	 * conditional VACANT-only update underneath, which is what makes two seekers racing for the
+	 * same bed safe: see {@code BedHoldConcurrencyTest}.
+	 */
+	@Transactional
+	public BedState holdForVisit(long bedId, long seekerId) {
+		return performTransition(bedId, BedState.HELD, "visit requested", null, seekerId);
+	}
+
+	/**
+	 * Releases a hold: a decline, a seeker's own cancellation, or the scheduled expiry sweep.
+	 * {@code actorId} is null for the system sweep - {@code bed_state_log.changed_by} allows null.
+	 */
+	@Transactional
+	public BedState releaseHold(long bedId, Long actorId, String reason) {
+		return performTransition(bedId, BedState.VACANT, reason, null, actorId);
+	}
+
+	/**
+	 * The actual state-machine move, shared by every caller above: validate the transition, apply
+	 * the conditional update, write the audit row. No same-state shortcut on purpose - if a bed is
+	 * already HELD, a second seeker asking to hold it must be told no, not quietly told yes.
+	 */
+	private BedState performTransition(long bedId, BedState next, String reason, LocalDate availableFrom, Long actorId) {
 		BedState current = beds.currentState(bedId)
 				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BED_NOT_FOUND", "No such bed"));
 
-		// No same-state shortcut on purpose: if a bed is already HELD, a second seeker
-		// asking to hold it must be told no, not quietly told yes. See BedHoldConcurrencyTest.
 		if (!current.canMoveTo(next)) {
 			throw new ApiException(HttpStatus.CONFLICT, "INVALID_TRANSITION",
 					current == next
@@ -63,7 +90,7 @@ public class BedService {
 			throw new ApiException(HttpStatus.CONFLICT, "BED_STATE_CHANGED",
 					"Someone else just changed this bed. Refresh and try again.");
 		}
-		beds.log(bedId, current, next, authed.id(), reason);
+		beds.log(bedId, current, next, actorId, reason);
 		return next;
 	}
 }

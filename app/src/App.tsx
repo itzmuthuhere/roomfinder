@@ -2,20 +2,28 @@ import { useEffect, useState } from 'react'
 import OwnerPage from './owner/OwnerPage'
 import SearchPage from './seeker/SearchPage'
 import ListingPage from './seeker/ListingPage'
+import MyBookingsPage from './seeker/MyBookingsPage'
 
 type Ping = { ok: boolean; beds: number; pgs: number }
 
+type Route =
+  | { name: 'owner' }
+  | { name: 'search' }
+  | { name: 'bookings' }
+  | { name: 'listing'; pgId: number }
+
 /**
- * No router library yet (one-line justification for not adding one: this app has exactly three
+ * No router library yet (one-line justification for not adding one: this app has a handful of
  * screens and full-page navigation between them is fine for now) - a plain pathname switch plus
  * ordinary <a> links. Revisit with a real router once there are enough screens for client-side
  * navigation to matter.
  */
-function currentRoute(): { name: 'owner' } | { name: 'search' } | { name: 'listing'; pgId: number } {
+function currentRoute(): Route {
   const path = window.location.pathname
   const listingMatch = path.match(/^\/pgs\/(\d+)$/)
   if (listingMatch) return { name: 'listing', pgId: Number(listingMatch[1]) }
   if (path === '/search') return { name: 'search' }
+  if (path === '/bookings') return { name: 'bookings' }
   return { name: 'owner' }
 }
 
@@ -37,6 +45,7 @@ export default function App() {
         <span className="row">
           <strong>RoomFinder</strong>
           <a href="/search">Find a PG</a>
+          <a href="/bookings">My bookings</a>
           <a href="/">Owner</a>
         </span>
         <span className="muted">
@@ -45,6 +54,7 @@ export default function App() {
       </nav>
       {route.name === 'search' && <SearchPage />}
       {route.name === 'listing' && <ListingPage pgId={route.pgId} />}
+      {route.name === 'bookings' && <MyBookingsPage />}
       {route.name === 'owner' && <OwnerPage />}
     </div>
   )

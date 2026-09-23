@@ -77,3 +77,25 @@ export type SearchResult = {
   vacantBeds: number
   distanceKm: number | null
 }
+
+export type BookingStatus = 'REQUESTED' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED' | 'COMPLETED' | 'MOVED_IN' | 'NO_SHOW'
+
+export type Booking = {
+  id: number
+  bedId: number
+  kind: string
+  status: BookingStatus
+  visitSlot: string
+  holdExpiresAt: string
+  tokenAmount: number
+  createdAt: string
+}
+
+export type OwnerBooking = {
+  id: number
+  bedId: number
+  seekerPhone: string
+  status: BookingStatus
+  visitSlot: string
+  holdExpiresAt: string
+}

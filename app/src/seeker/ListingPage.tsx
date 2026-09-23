@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError, type Bed, type PgDetail } from '../lib/api'
+import { api, ApiError, type Bed, type Booking, type PgDetail } from '../lib/api'
+import { currentUser, type AuthedUser } from '../lib/auth'
+import { LoginPage } from '../auth/LoginPage'
 
 export default function ListingPage({ pgId }: { pgId: number }) {
   const [detail, setDetail] = useState<PgDetail | null>(null)
@@ -75,6 +77,94 @@ export default function ListingPage({ pgId }: { pgId: number }) {
         <p>Food: {pg.foodIncluded == null ? 'Not specified' : pg.foodIncluded ? `Included${pg.foodType ? ` (${pg.foodType.toLowerCase()})` : ''}` : 'Not included'}</p>
         <p>Notice period: {pg.noticePeriodDays != null ? `${pg.noticePeriodDays} days` : 'Not specified'}</p>
       </section>
+
+      <VisitRequestSection vacantBeds={beds.filter((b) => b.state === 'VACANT')} />
     </div>
+  )
+}
+
+function VisitRequestSection({ vacantBeds }: { vacantBeds: Bed[] }) {
+  const [user, setUser] = useState<AuthedUser | null>(currentUser())
+
+  if (!user || user.role !== 'SEEKER') {
+    return (
+      <section className="card">
+        <h3>Want to visit?</h3>
+        <p className="muted">Sign in as a seeker to request a visit slot.</p>
+        <LoginPage role="SEEKER" onSignedIn={setUser} />
+      </section>
+    )
+  }
+
+  if (vacantBeds.length === 0) {
+    return (
+      <section className="card">
+        <h3>Want to visit?</h3>
+        <p className="muted">No vacant beds right now - check back later.</p>
+      </section>
+    )
+  }
+
+  return <VisitRequestForm vacantBeds={vacantBeds} />
+}
+
+function VisitRequestForm({ vacantBeds }: { vacantBeds: Bed[] }) {
+  const [bedId, setBedId] = useState(vacantBeds[0].id)
+  const [slot, setSlot] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState<Booking | null>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
+    try {
+      const visitSlot = new Date(slot).toISOString()
+      const booking = await api.post<Booking>('/bookings/visit', { bedId, visitSlot })
+      setConfirmed(booking)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (confirmed) {
+    return (
+      <section className="card">
+        <h3>Visit requested</h3>
+        <p>
+          This bed is held for you until {new Date(confirmed.holdExpiresAt).toLocaleString()} while the
+          owner confirms.
+        </p>
+        <a href="/bookings">See my bookings</a>
+      </section>
+    )
+  }
+
+  const minSlot = new Date(Date.now() + 30 * 60 * 1000).toISOString().slice(0, 16)
+
+  return (
+    <form className="card" onSubmit={submit}>
+      <h3>Want to visit?</h3>
+      {error && <p className="bad">{error}</p>}
+      <label className="field">
+        <span>Bed</span>
+        <select value={bedId} onChange={(e) => setBedId(Number(e.target.value))}>
+          {vacantBeds.map((b) => (
+            <option key={b.id} value={b.id}>
+              Room {b.roomNo ?? b.roomId} · Bed {b.bedLabel} · ₹{b.rentPerBed}/bed
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="field">
+        <span>Visit time</span>
+        <input type="datetime-local" min={minSlot} value={slot} onChange={(e) => setSlot(e.target.value)} required />
+      </label>
+      <button type="submit" disabled={busy || !slot}>{busy ? 'Requesting…' : 'Request a visit'}</button>
+      <p className="muted">This holds the bed for you until the owner confirms or the hold expires.</p>
+    </form>
   )
 }

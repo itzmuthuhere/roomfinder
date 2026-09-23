@@ -4,6 +4,7 @@ import { currentUser, logout, type AuthedUser } from '../lib/auth'
 import { LoginPage } from '../auth/LoginPage'
 import { BedGrid } from './BedGrid'
 import { MediaManager } from './MediaManager'
+import { VisitRequests } from './VisitRequests'
 
 export default function OwnerPage() {
   const [user, setUser] = useState<AuthedUser | null>(currentUser())
@@ -49,7 +50,7 @@ export default function OwnerPage() {
   }, [user])
 
   if (!user) {
-    return <LoginPage onSignedIn={setUser} />
+    return <LoginPage role="OWNER" onSignedIn={setUser} />
   }
 
   return (
@@ -89,6 +90,7 @@ export default function OwnerPage() {
             </span>
           </header>
           <AddRoomForm pgId={selected.pg.id} onAdded={(d) => { setSelected(d); void loadPgs() }} />
+          <VisitRequests pgId={selected.pg.id} onChanged={() => { void openPg(selected.pg.id); void loadPgs() }} />
           <BedGrid detail={selected} onChanged={() => { void openPg(selected.pg.id); void loadPgs() }} />
           <MediaManager detail={selected} onChanged={() => { void openPg(selected.pg.id) }} />
           <StatusToggle pg={selected.pg} onChanged={() => { void openPg(selected.pg.id); void loadPgs() }} />

@@ -20,23 +20,26 @@ roomfinder/
 │       ├── pg/            PG onboarding: rooms, beds, listing status
 │       ├── media/         photo + video upload, local disk storage, MP4 metadata scrub
 │       ├── search/        GET /api/search: PostGIS radius + filters over LIVE, vacant-bed PGs
+│       ├── booking/       Visit booking: holds a bed, owner accept/decline, HoldExpiryJob sweep
+│       ├── notify/        WhatsAppSender interface; LoggingWhatsAppSender is the only sender so far
 │       └── health/        /api/ping, proves the stack end to end
 └── app/src/
     ├── lib/api.ts         fetch wrapper, types, attaches the bearer token to every call
     ├── lib/auth.ts        OTP request/verify, token storage, decodes the JWT for display only
     ├── lib/upload.ts      XHR upload with progress, canvas downscale, EXIF drop
-    ├── auth/              LoginPage (phone → code)
-    ├── owner/             OwnerPage, BedGrid, MediaManager
-    └── seeker/            SearchPage, ListingPage (public, no login)
+    ├── auth/              LoginPage (phone → code, parameterised by role)
+    ├── owner/             OwnerPage, BedGrid, MediaManager, VisitRequests (accept/decline)
+    └── seeker/            SearchPage, ListingPage (+ visit request), MyBookingsPage
 ```
 
 App.tsx routes between owner/, seeker/ and login by a plain `window.location.pathname` switch, not
-a router library — three screens, ordinary `<a>` navigation is enough for now (see its comment).
+a router library — a handful of screens, ordinary `<a>` navigation is enough for now (see its comment).
 
 ## Data model (V1 + V2 + V3 migrations)
 
 `app_user` → `pg_property` → `room` → `bed`, with `bed_state_log` as the audit trail.
-`booking`, `tenancy`, `rent_payment` exist in V1 but are not used yet.
+`booking` (VISIT bookings only so far — RESERVE/tenancy is not built), `tenancy`, `rent_payment`
+exist in V1; `tenancy`/`rent_payment` are not used yet.
 `media` holds photos and one video per PG, with `is_cover` and partial unique indexes.
 `otp_request` (V3) holds hashed, short-lived login codes — never the code itself.
 
@@ -70,6 +73,11 @@ same-state shortcut on purpose: a second seeker asking to hold an already-held b
 no, not quietly told yes. `BedHoldConcurrencyTest` (50 threads, one winner) pins this and must
 never be deleted or weakened.
 
+`BedService` has three ways in, all sharing one private `performTransition`: `changeState` (the
+owner's own bed grid, ownership-checked), `holdForVisit` (a seeker holding a bed themselves — not
+an owner action, no ownership check, same conditional update) and `releaseHold` (decline, a
+seeker's cancellation, or `booking/HoldExpiryJob`'s sweep — `actorId` is null for the sweep).
+
 ## Conventions
 
 - Repositories use Spring `JdbcClient` with explicit SQL, not JPA entities (ADR-005).
@@ -88,15 +96,21 @@ automatically) → sees a colour-coded bed grid → changes bed states with audi
 room photos and one walkthrough video → toggles the listing between DRAFT and LIVE. Every write is
 checked against the signed-in owner; another owner's token gets 403, no token gets 401. A stranger
 with no account can search LIVE PGs by area or nearby-me radius, budget, sharing, gender and food/AC,
-and open a listing page with photos, video, room-by-room rent and vacancy.
+and open a listing page with photos, video, room-by-room rent and vacancy. A seeker who signs in can
+request a visit slot on a specific bed (which holds it), see their bookings with a countdown, and
+cancel; the owner sees pending requests on that PG and can accept or decline; an unresolved hold
+releases itself automatically within a minute of expiring.
 
 ## What does not exist yet
 
-**Real SMS delivery.** OTPs are logged to the server console, not texted — `Msg91OtpSender` exists
-but needs a real MSG91 account, DLT template registration, and a live test before `OTP_PROVIDER=msg91`
-can be turned on anywhere. Nothing is deployable until this is done (see BACKLOG.md's Deploy item).
+**Real SMS and WhatsApp delivery.** OTPs and booking notifications are logged to the server
+console, not sent — `Msg91OtpSender` and a real WhatsApp Cloud API sender both need manual account
+setup (MSG91 + DLT template registration; a Meta Business account + verified number + template
+approval) that cannot happen from code, and neither has been run against a real account. Nothing is
+deployable until this is done (see BACKLOG.md's Deploy item).
 
-Also missing: visit booking with holds and expiry, rent register, notices, reviews, the Capacitor
+Also missing: a RESERVE/move-in booking flow (only VISIT bookings exist — accepting a visit does not
+create a tenancy or move the bed toward BOOKED), rent register, notices, reviews, the Capacitor
 mobile wrapper, and any deployment.
 
 ## Gotchas discovered so far
