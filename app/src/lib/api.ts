@@ -1,12 +1,4 @@
-// Temporary: the owner id is chosen in the UI until phone OTP login exists.
-export function currentOwnerId(): number | null {
-  const v = localStorage.getItem('ownerId')
-  return v ? Number(v) : null
-}
-
-export function setOwnerId(id: number) {
-  localStorage.setItem('ownerId', String(id))
-}
+import { currentToken } from './auth'
 
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
@@ -15,12 +7,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const ownerId = currentOwnerId()
+  const token = currentToken()
   const res = await fetch(`/api${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      ...(ownerId ? { 'X-Owner-Id': String(ownerId) } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   })

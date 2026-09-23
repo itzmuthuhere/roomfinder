@@ -1,6 +1,8 @@
 package com.roomfinder.media;
 
 import com.roomfinder.AbstractDbTest;
+import com.roomfinder.auth.AuthedUser;
+import com.roomfinder.auth.Role;
 import com.roomfinder.common.ApiException;
 import com.roomfinder.media.MediaDtos.MediaView;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +23,7 @@ class MediaServiceTest extends AbstractDbTest {
 
 	long pgId;
 	long roomId;
+	AuthedUser owner;
 
 	@BeforeEach
 	void seed() {
@@ -33,6 +36,7 @@ class MediaServiceTest extends AbstractDbTest {
 
 		long ownerId = db.sql("insert into app_user (phone, name, role) values ('9000000003','O','OWNER') returning id")
 				.query(Long.class).single();
+		owner = new AuthedUser(ownerId, "9000000003", Role.OWNER);
 		pgId = db.sql("""
 				insert into pg_property (owner_id, name, gender_type, address, area, location, status)
 				values (:o, 'Media PG', 'BOYS', 'Addr', 'Velachery',
@@ -46,8 +50,8 @@ class MediaServiceTest extends AbstractDbTest {
 
 	@Test
 	void first_photo_becomes_the_cover_automatically() {
-		MediaView first = media.uploadPhoto(pgId, roomId, jpeg());
-		MediaView second = media.uploadPhoto(pgId, roomId, jpeg());
+		MediaView first = media.uploadPhoto(owner, pgId, roomId, jpeg());
+		MediaView second = media.uploadPhoto(owner, pgId, roomId, jpeg());
 
 		assertThat(first.isCover()).isTrue();
 		assertThat(second.isCover()).isFalse();
@@ -56,10 +60,10 @@ class MediaServiceTest extends AbstractDbTest {
 
 	@Test
 	void deleting_the_cover_promotes_the_next_photo() {
-		MediaView first = media.uploadPhoto(pgId, roomId, jpeg());
-		MediaView second = media.uploadPhoto(pgId, roomId, jpeg());
+		MediaView first = media.uploadPhoto(owner, pgId, roomId, jpeg());
+		MediaView second = media.uploadPhoto(owner, pgId, roomId, jpeg());
 
-		media.delete(first.id());
+		media.delete(owner, first.id());
 
 		List<MediaView> left = media.listForPg(pgId);
 		assertThat(left).hasSize(1);
@@ -70,10 +74,10 @@ class MediaServiceTest extends AbstractDbTest {
 	@Test
 	void eleventh_photo_in_a_room_is_rejected() {
 		for (int i = 0; i < 10; i++) {
-			media.uploadPhoto(pgId, roomId, jpeg());
+			media.uploadPhoto(owner, pgId, roomId, jpeg());
 		}
 
-		assertThatThrownBy(() -> media.uploadPhoto(pgId, roomId, jpeg()))
+		assertThatThrownBy(() -> media.uploadPhoto(owner, pgId, roomId, jpeg()))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("already has 10 photos");
 	}
@@ -82,25 +86,25 @@ class MediaServiceTest extends AbstractDbTest {
 	void a_file_that_is_not_an_accepted_type_is_rejected() {
 		byte[] notAnImage = "<html>hello</html>".getBytes(StandardCharsets.UTF_8);
 
-		assertThatThrownBy(() -> media.uploadPhoto(pgId, roomId, notAnImage))
+		assertThatThrownBy(() -> media.uploadPhoto(owner, pgId, roomId, notAnImage))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("jpeg, png, webp");
 	}
 
 	@Test
 	void a_video_uploaded_where_a_photo_is_expected_is_rejected() {
-		assertThatThrownBy(() -> media.uploadPhoto(pgId, roomId, mp4(30)))
+		assertThatThrownBy(() -> media.uploadPhoto(owner, pgId, roomId, mp4(30)))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("looks like a video");
 	}
 
 	@Test
 	void reorder_rewrites_sort_order() {
-		MediaView a = media.uploadPhoto(pgId, roomId, jpeg());
-		MediaView b = media.uploadPhoto(pgId, roomId, jpeg());
-		MediaView c = media.uploadPhoto(pgId, roomId, jpeg());
+		MediaView a = media.uploadPhoto(owner, pgId, roomId, jpeg());
+		MediaView b = media.uploadPhoto(owner, pgId, roomId, jpeg());
+		MediaView c = media.uploadPhoto(owner, pgId, roomId, jpeg());
 
-		media.reorder(pgId, roomId, List.of(c.id(), a.id(), b.id()));
+		media.reorder(owner, pgId, roomId, List.of(c.id(), a.id(), b.id()));
 
 		List<MediaView> ordered = media.listForPg(pgId).stream()
 				.sorted(java.util.Comparator.comparingInt(MediaView::sortOrder))
@@ -110,18 +114,18 @@ class MediaServiceTest extends AbstractDbTest {
 
 	@Test
 	void reorder_with_a_stale_list_is_rejected() {
-		MediaView a = media.uploadPhoto(pgId, roomId, jpeg());
-		media.uploadPhoto(pgId, roomId, jpeg());
+		MediaView a = media.uploadPhoto(owner, pgId, roomId, jpeg());
+		media.uploadPhoto(owner, pgId, roomId, jpeg());
 
-		assertThatThrownBy(() -> media.reorder(pgId, roomId, List.of(a.id())))
+		assertThatThrownBy(() -> media.reorder(owner, pgId, roomId, List.of(a.id())))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("list changed");
 	}
 
 	@Test
 	void uploading_a_second_video_replaces_the_first() {
-		MediaView first = media.uploadVideo(pgId, mp4(30));
-		MediaView second = media.uploadVideo(pgId, mp4(20));
+		MediaView first = media.uploadVideo(owner, pgId, mp4(30));
+		MediaView second = media.uploadVideo(owner, pgId, mp4(20));
 
 		List<MediaView> videos = media.listForPg(pgId).stream().filter(m -> m.kind().equals("VIDEO")).toList();
 		assertThat(videos).hasSize(1);
@@ -131,7 +135,7 @@ class MediaServiceTest extends AbstractDbTest {
 
 	@Test
 	void a_video_longer_than_a_minute_is_rejected() {
-		assertThatThrownBy(() -> media.uploadVideo(pgId, mp4(95)))
+		assertThatThrownBy(() -> media.uploadVideo(owner, pgId, mp4(95)))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("60 seconds or under");
 	}

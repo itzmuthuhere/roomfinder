@@ -6,5 +6,6 @@ api/build/
 api/.gradle/
 app/node_modules/
 app/dist/
+app/*.tsbuildinfo
 .DS_Store
 data/

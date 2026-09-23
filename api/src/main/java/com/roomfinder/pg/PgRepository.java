@@ -81,6 +81,13 @@ public class PgRepository {
 				.list();
 	}
 
+	public Optional<Long> ownerIdOf(long pgId) {
+		return db.sql("select owner_id from pg_property where id = :id")
+				.param("id", pgId)
+				.query(Long.class)
+				.optional();
+	}
+
 	public void setStatus(long pgId, String status) {
 		db.sql("update pg_property set status = :status where id = :id")
 				.param("status", status)

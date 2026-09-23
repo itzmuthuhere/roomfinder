@@ -1,5 +1,7 @@
 package com.roomfinder.bed;
 
+import com.roomfinder.auth.AuthedUser;
+import com.roomfinder.auth.JwtAuthFilter;
 import com.roomfinder.bed.BedDtos.ChangeStateRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -27,12 +29,12 @@ public class BedController {
 		return service.history(bedId);
 	}
 
-	// TODO(auth): actorId comes from the JWT once phone OTP login exists.
 	@PatchMapping("/beds/{bedId}/state")
-	public Map<String, Object> changeState(@PathVariable long bedId,
-	                                       @Valid @RequestBody ChangeStateRequest req,
-	                                       @RequestHeader(value = "X-Owner-Id", required = false) Long actorId) {
-		BedState now = service.changeState(bedId, req.toState(), req.reason(), req.availableFrom(), actorId);
+	public Map<String, Object> changeState(
+			@RequestAttribute(name = JwtAuthFilter.REQUEST_ATTRIBUTE, required = false) AuthedUser user,
+			@PathVariable long bedId,
+			@Valid @RequestBody ChangeStateRequest req) {
+		BedState now = service.changeState(user, bedId, req.toState(), req.reason(), req.availableFrom());
 		return Map.of("id", bedId, "state", now);
 	}
 }

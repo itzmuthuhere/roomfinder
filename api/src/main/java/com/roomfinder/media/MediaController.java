@@ -1,5 +1,7 @@
 package com.roomfinder.media;
 
+import com.roomfinder.auth.AuthedUser;
+import com.roomfinder.auth.JwtAuthFilter;
 import com.roomfinder.common.ApiException;
 import com.roomfinder.media.MediaDtos.MediaView;
 import com.roomfinder.media.MediaDtos.ReorderRequest;
@@ -16,6 +18,8 @@ import java.util.Map;
 @RequestMapping("/api")
 public class MediaController {
 
+	private static final String AUTHED_USER = JwtAuthFilter.REQUEST_ATTRIBUTE;
+
 	private final MediaService service;
 
 	public MediaController(MediaService service) {
@@ -28,31 +32,36 @@ public class MediaController {
 	}
 
 	@PostMapping("/pgs/{pgId}/rooms/{roomId}/media/photos")
-	public MediaView uploadPhoto(@PathVariable long pgId, @PathVariable long roomId,
+	public MediaView uploadPhoto(@RequestAttribute(name = AUTHED_USER, required = false) AuthedUser user,
+	                             @PathVariable long pgId, @PathVariable long roomId,
 	                             @RequestParam("file") MultipartFile file) {
-		return service.uploadPhoto(pgId, roomId, read(file));
+		return service.uploadPhoto(user, pgId, roomId, read(file));
 	}
 
 	@PostMapping("/pgs/{pgId}/media/video")
-	public MediaView uploadVideo(@PathVariable long pgId, @RequestParam("file") MultipartFile file) {
-		return service.uploadVideo(pgId, read(file));
+	public MediaView uploadVideo(@RequestAttribute(name = AUTHED_USER, required = false) AuthedUser user,
+	                             @PathVariable long pgId, @RequestParam("file") MultipartFile file) {
+		return service.uploadVideo(user, pgId, read(file));
 	}
 
 	@PatchMapping("/pgs/{pgId}/media/{mediaId}/cover")
-	public MediaView setCover(@PathVariable long pgId, @PathVariable long mediaId) {
-		return service.setCover(pgId, mediaId);
+	public MediaView setCover(@RequestAttribute(name = AUTHED_USER, required = false) AuthedUser user,
+	                          @PathVariable long pgId, @PathVariable long mediaId) {
+		return service.setCover(user, pgId, mediaId);
 	}
 
 	@PatchMapping("/pgs/{pgId}/rooms/{roomId}/media/reorder")
-	public List<MediaView> reorder(@PathVariable long pgId, @PathVariable long roomId,
+	public List<MediaView> reorder(@RequestAttribute(name = AUTHED_USER, required = false) AuthedUser user,
+	                               @PathVariable long pgId, @PathVariable long roomId,
 	                               @Valid @RequestBody ReorderRequest req) {
-		service.reorder(pgId, roomId, req.orderedIds());
+		service.reorder(user, pgId, roomId, req.orderedIds());
 		return service.listForPg(pgId);
 	}
 
 	@DeleteMapping("/media/{mediaId}")
-	public Map<String, Object> delete(@PathVariable long mediaId) {
-		service.delete(mediaId);
+	public Map<String, Object> delete(@RequestAttribute(name = AUTHED_USER, required = false) AuthedUser user,
+	                                  @PathVariable long mediaId) {
+		service.delete(user, mediaId);
 		return Map.of("deleted", mediaId);
 	}
 

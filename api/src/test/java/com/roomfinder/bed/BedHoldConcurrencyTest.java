@@ -1,6 +1,8 @@
 package com.roomfinder.bed;
 
 import com.roomfinder.AbstractDbTest;
+import com.roomfinder.auth.AuthedUser;
+import com.roomfinder.auth.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,7 @@ class BedHoldConcurrencyTest extends AbstractDbTest {
 	@Autowired BedService bedService;
 
 	long bedId;
+	AuthedUser owner;
 
 	@BeforeEach
 	void seed() {
@@ -37,6 +40,7 @@ class BedHoldConcurrencyTest extends AbstractDbTest {
 
 		long ownerId = db.sql("insert into app_user (phone, name, role) values ('9000000002','O','OWNER') returning id")
 				.query(Long.class).single();
+		owner = new AuthedUser(ownerId, "9000000002", Role.OWNER);
 		long pgId = db.sql("""
 				insert into pg_property (owner_id, name, gender_type, address, area, location, status)
 				values (:o, 'Race PG', 'BOYS', 'Addr', 'Sholinganallur',
@@ -62,7 +66,7 @@ class BedHoldConcurrencyTest extends AbstractDbTest {
 			futures.add(pool.submit(() -> {
 				startGun.await();
 				try {
-					bedService.changeState(bedId, BedState.HELD, "race", null, null);
+					bedService.changeState(owner, bedId, BedState.HELD, "race", null);
 					winners.incrementAndGet();
 				} catch (RuntimeException expected) {
 					losers.incrementAndGet();

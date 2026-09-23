@@ -1,4 +1,4 @@
-import { currentOwnerId } from './api'
+import { currentToken } from './auth'
 
 export type Media = {
   id: number
@@ -66,8 +66,8 @@ export function uploadFile(
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', `/api${path}`)
-    const ownerId = currentOwnerId()
-    if (ownerId) xhr.setRequestHeader('X-Owner-Id', String(ownerId))
+    const token = currentToken()
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))

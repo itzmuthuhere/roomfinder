@@ -1,5 +1,7 @@
 package com.roomfinder.pg;
 
+import com.roomfinder.auth.AuthedUser;
+import com.roomfinder.auth.JwtAuthFilter;
 import com.roomfinder.pg.PgDtos.*;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -17,15 +19,15 @@ public class PgController {
 		this.service = service;
 	}
 
-	// TODO(auth): ownerId comes from the JWT once phone OTP login exists.
 	@PostMapping
-	public PgView create(@RequestHeader("X-Owner-Id") long ownerId, @Valid @RequestBody CreatePgRequest req) {
-		return service.create(ownerId, req);
+	public PgView create(@RequestAttribute(name = JwtAuthFilter.REQUEST_ATTRIBUTE, required = false) AuthedUser user,
+	                     @Valid @RequestBody CreatePgRequest req) {
+		return service.create(user, req);
 	}
 
 	@GetMapping
-	public List<PgView> mine(@RequestHeader("X-Owner-Id") long ownerId) {
-		return service.listForOwner(ownerId);
+	public List<PgView> mine(@RequestAttribute(name = JwtAuthFilter.REQUEST_ATTRIBUTE, required = false) AuthedUser user) {
+		return service.listForOwner(user);
 	}
 
 	@GetMapping("/{pgId}")
@@ -34,12 +36,14 @@ public class PgController {
 	}
 
 	@PostMapping("/{pgId}/rooms")
-	public PgDetail addRoom(@PathVariable long pgId, @Valid @RequestBody CreateRoomRequest req) {
-		return service.addRoom(pgId, req);
+	public PgDetail addRoom(@RequestAttribute(name = JwtAuthFilter.REQUEST_ATTRIBUTE, required = false) AuthedUser user,
+	                        @PathVariable long pgId, @Valid @RequestBody CreateRoomRequest req) {
+		return service.addRoom(user, pgId, req);
 	}
 
 	@PatchMapping("/{pgId}/status")
-	public PgView setStatus(@PathVariable long pgId, @RequestBody Map<String, String> body) {
-		return service.setStatus(pgId, body.getOrDefault("status", "DRAFT"));
+	public PgView setStatus(@RequestAttribute(name = JwtAuthFilter.REQUEST_ATTRIBUTE, required = false) AuthedUser user,
+	                        @PathVariable long pgId, @RequestBody Map<String, String> body) {
+		return service.setStatus(user, pgId, body.getOrDefault("status", "DRAFT"));
 	}
 }

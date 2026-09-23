@@ -1,52 +1,65 @@
 import { useEffect, useState } from 'react'
-import { api, ApiError, currentOwnerId, setOwnerId, type Pg, type PgDetail } from '../lib/api'
+import { api, ApiError, type Pg, type PgDetail } from '../lib/api'
+import { currentUser, logout, type AuthedUser } from '../lib/auth'
+import { LoginPage } from '../auth/LoginPage'
 import { BedGrid } from './BedGrid'
 import { MediaManager } from './MediaManager'
 
 export default function OwnerPage() {
-  const [ownerId, setOwner] = useState<number | null>(currentOwnerId())
+  const [user, setUser] = useState<AuthedUser | null>(currentUser())
   const [pgs, setPgs] = useState<Pg[]>([])
   const [selected, setSelected] = useState<PgDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  function signOut() {
+    logout()
+    setUser(null)
+    setPgs([])
+    setSelected(null)
+  }
+
+  /** A token that expired or was signed with an old secret reads as UNAUTHENTICATED - send the owner back to login. */
+  function handleApiError(e: unknown) {
+    if (e instanceof ApiError && e.code === 'UNAUTHENTICATED') {
+      signOut()
+      return
+    }
+    setError(e instanceof ApiError ? e.message : String(e))
+  }
+
   async function loadPgs() {
-    if (!ownerId) return
+    if (!user) return
     try {
       setPgs(await api.get<Pg[]>('/pgs'))
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : String(e))
+      handleApiError(e)
     }
   }
 
   async function openPg(id: number) {
-    setSelected(await api.get<PgDetail>(`/pgs/${id}`))
+    try {
+      setSelected(await api.get<PgDetail>(`/pgs/${id}`))
+    } catch (e) {
+      handleApiError(e)
+    }
   }
 
   useEffect(() => {
     void loadPgs()
-  }, [ownerId])
+  }, [user])
 
-  async function createOwner() {
-    const res = await api.post<{ id: number }>('/dev/owners', { phone: '9000000000', name: 'Me' })
-    setOwnerId(res.id)
-    setOwner(res.id)
-  }
-
-  if (!ownerId) {
-    return (
-      <div className="card">
-        <p>No owner account on this browser yet.</p>
-        <button onClick={createOwner}>Create a test owner</button>
-        <p className="muted">Temporary, until phone login exists.</p>
-      </div>
-    )
+  if (!user) {
+    return <LoginPage onSignedIn={setUser} />
   }
 
   return (
     <div className="page">
       <header>
         <h2>My PGs</h2>
-        <span className="muted">owner #{ownerId}</span>
+        <span className="row">
+          <span className="muted">{user.phone}</span>
+          <button onClick={signOut}>Sign out</button>
+        </span>
       </header>
 
       {error && <p className="bad">{error}</p>}

@@ -1,6 +1,8 @@
 package com.roomfinder.bed;
 
 import com.roomfinder.AbstractDbTest;
+import com.roomfinder.auth.AuthedUser;
+import com.roomfinder.auth.Role;
 import com.roomfinder.common.ApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ class BedStateMachineTest extends AbstractDbTest {
 	@Autowired BedService bedService;
 
 	long bedId;
+	AuthedUser owner;
 
 	@BeforeEach
 	void seed() {
@@ -29,6 +32,7 @@ class BedStateMachineTest extends AbstractDbTest {
 
 		long ownerId = db.sql("insert into app_user (phone, name, role) values ('9000000001','O','OWNER') returning id")
 				.query(Long.class).single();
+		owner = new AuthedUser(ownerId, "9000000001", Role.OWNER);
 		long pgId = db.sql("""
 				insert into pg_property (owner_id, name, gender_type, address, area, location, status)
 				values (:o, 'Test PG', 'BOYS', 'Addr', 'Thoraipakkam',
@@ -44,7 +48,7 @@ class BedStateMachineTest extends AbstractDbTest {
 
 	@Test
 	void allows_a_legal_transition_and_writes_an_audit_row() {
-		bedService.changeState(bedId, BedState.HELD, "seeker booked a visit", null, null);
+		bedService.changeState(owner, bedId, BedState.HELD, "seeker booked a visit", null);
 
 		assertThat(currentState()).isEqualTo("HELD");
 		assertThat(bedService.history(bedId)).hasSize(1);
@@ -53,7 +57,7 @@ class BedStateMachineTest extends AbstractDbTest {
 
 	@Test
 	void rejects_an_illegal_transition() {
-		assertThatThrownBy(() -> bedService.changeState(bedId, BedState.ON_NOTICE, null, LocalDate.now(), null))
+		assertThatThrownBy(() -> bedService.changeState(owner, bedId, BedState.ON_NOTICE, null, LocalDate.now()))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("cannot go from VACANT to ON_NOTICE");
 
@@ -62,14 +66,14 @@ class BedStateMachineTest extends AbstractDbTest {
 
 	@Test
 	void on_notice_requires_a_date_and_keeps_it() {
-		bedService.changeState(bedId, BedState.OCCUPIED, "tenant moved in", null, null);
+		bedService.changeState(owner, bedId, BedState.OCCUPIED, "tenant moved in", null);
 
-		assertThatThrownBy(() -> bedService.changeState(bedId, BedState.ON_NOTICE, null, null, null))
+		assertThatThrownBy(() -> bedService.changeState(owner, bedId, BedState.ON_NOTICE, null, null))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("Set the date");
 
 		LocalDate free = LocalDate.now().plusDays(30);
-		bedService.changeState(bedId, BedState.ON_NOTICE, "notice given", free, null);
+		bedService.changeState(owner, bedId, BedState.ON_NOTICE, "notice given", free);
 
 		LocalDate stored = db.sql("select available_from from bed where id = :id")
 				.param("id", bedId).query(LocalDate.class).single();
@@ -78,9 +82,9 @@ class BedStateMachineTest extends AbstractDbTest {
 
 	@Test
 	void asking_for_a_state_the_bed_is_already_in_is_rejected() {
-		bedService.changeState(bedId, BedState.HELD, "first seeker", null, null);
+		bedService.changeState(owner, bedId, BedState.HELD, "first seeker", null);
 
-		assertThatThrownBy(() -> bedService.changeState(bedId, BedState.HELD, "second seeker", null, null))
+		assertThatThrownBy(() -> bedService.changeState(owner, bedId, BedState.HELD, "second seeker", null))
 				.isInstanceOf(ApiException.class)
 				.hasMessageContaining("already HELD");
 	}

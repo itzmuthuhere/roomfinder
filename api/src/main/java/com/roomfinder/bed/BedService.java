@@ -1,6 +1,8 @@
 package com.roomfinder.bed;
 
+import com.roomfinder.auth.AuthedUser;
 import com.roomfinder.common.ApiException;
+import com.roomfinder.pg.PgRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,9 +14,11 @@ import java.util.List;
 public class BedService {
 
 	private final BedRepository beds;
+	private final PgRepository pgs;
 
-	public BedService(BedRepository beds) {
+	public BedService(BedRepository beds, PgRepository pgs) {
 		this.beds = beds;
+		this.pgs = pgs;
 	}
 
 	public List<BedDtos.BedView> gridFor(long pgId) {
@@ -30,7 +34,13 @@ public class BedService {
 	 * and loses gracefully if someone else changed the bed first.
 	 */
 	@Transactional
-	public BedState changeState(long bedId, BedState next, String reason, LocalDate availableFrom, Long actorId) {
+	public BedState changeState(AuthedUser user, long bedId, BedState next, String reason, LocalDate availableFrom) {
+		AuthedUser authed = AuthedUser.require(user);
+		long pgId = beds.pgIdOf(bedId)
+				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BED_NOT_FOUND", "No such bed"));
+		long ownerId = pgs.ownerIdOf(pgId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BED_NOT_FOUND", "No such bed"));
+		authed.requireOwnerOf(ownerId);
+
 		BedState current = beds.currentState(bedId)
 				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "BED_NOT_FOUND", "No such bed"));
 
@@ -53,7 +63,7 @@ public class BedService {
 			throw new ApiException(HttpStatus.CONFLICT, "BED_STATE_CHANGED",
 					"Someone else just changed this bed. Refresh and try again.");
 		}
-		beds.log(bedId, current, next, actorId, reason);
+		beds.log(bedId, current, next, authed.id(), reason);
 		return next;
 	}
 }

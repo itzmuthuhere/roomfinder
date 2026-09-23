@@ -41,3 +41,15 @@ springdoc:
 media:
   # Local disk in dev; an object-storage implementation replaces this later.
   root: ${MEDIA_ROOT:./data/media}
+
+auth:
+  # Dev-only fallback, same pattern as spring.datasource.password above. Every real deployment
+  # must set AUTH_JWT_SECRET to a random value at least 32 bytes long - JwtService refuses to
+  # start otherwise.
+  jwt-secret: ${AUTH_JWT_SECRET:dev-only-jwt-secret-change-me-before-any-real-deploy-32bytes}
+
+otp:
+  provider: ${OTP_PROVIDER:log}   # log (dev default, prints the code) or msg91 (real SMS)
+  msg91:
+    auth-key: ${MSG91_AUTH_KEY:}
+    template-id: ${MSG91_TEMPLATE_ID:}

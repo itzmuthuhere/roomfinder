@@ -43,6 +43,13 @@ public class BedRepository {
 				.list();
 	}
 
+	public Optional<Long> pgIdOf(long bedId) {
+		return db.sql("select r.pg_id from bed b join room r on r.id = b.room_id where b.id = :id")
+				.param("id", bedId)
+				.query(Long.class)
+				.optional();
+	}
+
 	public Optional<BedState> currentState(long bedId) {
 		return db.sql("select state from bed where id = :id")
 				.param("id", bedId)

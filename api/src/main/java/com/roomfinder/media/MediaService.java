@@ -1,5 +1,6 @@
 package com.roomfinder.media;
 
+import com.roomfinder.auth.AuthedUser;
 import com.roomfinder.common.ApiException;
 import com.roomfinder.media.MediaDtos.MediaView;
 import com.roomfinder.pg.PgRepository;
@@ -40,7 +41,8 @@ public class MediaService {
 	}
 
 	@Transactional
-	public MediaView uploadPhoto(long pgId, long roomId, byte[] content) {
+	public MediaView uploadPhoto(AuthedUser user, long pgId, long roomId, byte[] content) {
+		requireOwnsPg(user, pgId);
 		requireRoomInPg(pgId, roomId);
 
 		MediaFileType type = sniffOrReject(content, MediaKind.PHOTO);
@@ -58,8 +60,8 @@ public class MediaService {
 	}
 
 	@Transactional
-	public MediaView uploadVideo(long pgId, byte[] content) {
-		pgs.findById(pgId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PG_NOT_FOUND", "No such PG"));
+	public MediaView uploadVideo(AuthedUser user, long pgId, byte[] content) {
+		requireOwnsPg(user, pgId);
 		sniffOrReject(content, MediaKind.VIDEO);
 
 		if (content.length > MAX_VIDEO_BYTES) {
@@ -92,14 +94,16 @@ public class MediaService {
 	}
 
 	@Transactional
-	public MediaView setCover(long pgId, long mediaId) {
+	public MediaView setCover(AuthedUser user, long pgId, long mediaId) {
+		requireOwnsPg(user, pgId);
 		MediaRow row = requirePhotoInPg(pgId, mediaId);
 		media.setCover(pgId, row.id());
 		return toView(media.findById(row.id()).orElseThrow());
 	}
 
 	@Transactional
-	public void reorder(long pgId, long roomId, List<Long> orderedIds) {
+	public void reorder(AuthedUser user, long pgId, long roomId, List<Long> orderedIds) {
+		requireOwnsPg(user, pgId);
 		requireRoomInPg(pgId, roomId);
 		List<MediaRow> current = media.listByPg(pgId).stream()
 				.filter(r -> r.kind() == MediaKind.PHOTO && r.roomId() != null && r.roomId() == roomId)
@@ -115,9 +119,10 @@ public class MediaService {
 	}
 
 	@Transactional
-	public void delete(long mediaId) {
+	public void delete(AuthedUser user, long mediaId) {
 		MediaRow row = media.findById(mediaId)
 				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "MEDIA_NOT_FOUND", "No such photo or video"));
+		requireOwnsPg(user, row.pgId());
 
 		media.deleteById(mediaId);
 
@@ -137,6 +142,13 @@ public class MediaService {
 					"That file looks like a " + type.kind.name().toLowerCase() + ", not a " + expectedKind.name().toLowerCase() + ".");
 		}
 		return type;
+	}
+
+	private void requireOwnsPg(AuthedUser user, long pgId) {
+		AuthedUser authed = AuthedUser.require(user);
+		long ownerId = pgs.ownerIdOf(pgId)
+				.orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "PG_NOT_FOUND", "No such PG"));
+		authed.requireOwnerOf(ownerId);
 	}
 
 	private void requireRoomInPg(long pgId, long roomId) {
