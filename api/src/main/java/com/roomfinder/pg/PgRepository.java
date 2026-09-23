@@ -95,9 +95,30 @@ public class PgRepository {
 				.update();
 	}
 
+	public void setUpiVpa(long pgId, String upiVpa) {
+		db.sql("update pg_property set upi_vpa = :upiVpa where id = :id")
+				.param("upiVpa", upiVpa)
+				.param("id", pgId)
+				.update();
+	}
+
+	/**
+	 * Empty either when the PG doesn't exist or when it has no VPA set - callers here only ever
+	 * care about "is there a VPA to put in a reminder", so the two cases don't need telling apart.
+	 * Built on {@code .list()} rather than {@code .optional()} because the column itself is
+	 * nullable: a matched row with a null value must not be confused with no row matching.
+	 */
+	public Optional<String> upiVpaOf(long pgId) {
+		List<String> rows = db.sql("select upi_vpa from pg_property where id = :id")
+				.param("id", pgId)
+				.query(String.class)
+				.list();
+		return rows.isEmpty() ? Optional.empty() : Optional.ofNullable(rows.get(0));
+	}
+
 	private static final String SELECT_PG = """
 			select p.id, p.name, p.gender_type, p.area, p.address, p.status, p.instant_book,
-			       p.food_included, p.food_type, p.notice_period_days,
+			       p.food_included, p.food_type, p.notice_period_days, p.upi_vpa,
 			       count(b.id) as total_beds,
 			       count(b.id) filter (where b.state = 'VACANT') as vacant_beds
 			  from pg_property p
@@ -118,6 +139,7 @@ public class PgRepository {
 				rs.getInt("vacant_beds"),
 				(Boolean) rs.getObject("food_included"),
 				rs.getString("food_type"),
-				(Integer) rs.getObject("notice_period_days"));
+				(Integer) rs.getObject("notice_period_days"),
+				rs.getString("upi_vpa"));
 	}
 }

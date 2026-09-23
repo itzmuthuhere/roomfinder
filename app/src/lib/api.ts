@@ -62,6 +62,7 @@ export type Pg = {
   foodIncluded: boolean | null
   foodType: string | null
   noticePeriodDays: number | null
+  upiVpa: string | null
 }
 
 export type PgDetail = { pg: Pg; beds: Bed[]; media: Media[] }
@@ -98,4 +99,32 @@ export type OwnerBooking = {
   status: BookingStatus
   visitSlot: string
   holdExpiresAt: string
+}
+
+export type TenancyStatus = 'ACTIVE' | 'ON_NOTICE' | 'ENDED'
+
+export type Tenancy = {
+  id: number
+  bedId: number
+  tenantPhone: string
+  tenantName: string | null
+  moveInDate: string
+  rentAmount: number
+  rentDueDay: number
+  noticeDate: string | null
+  vacateDate: string | null
+  status: TenancyStatus
+}
+
+export type RentPaymentStatus = 'PENDING' | 'PAID' | 'PARTIAL'
+
+export type RentPayment = {
+  id: number
+  tenancyId: number
+  bedId: number
+  tenantPhone: string
+  forMonth: string
+  amount: number
+  paidOn: string | null
+  status: RentPaymentStatus
 }

@@ -38,7 +38,10 @@ public class PgDtos {
 			int vacantBeds,
 			Boolean foodIncluded,
 			String foodType,
-			Integer noticePeriodDays) {}
+			Integer noticePeriodDays,
+			String upiVpa) {}
+
+	public record SetUpiRequest(String upiVpa) {}
 
 	public record PgDetail(PgView pg,
 	                       List<com.roomfinder.bed.BedDtos.BedView> beds,

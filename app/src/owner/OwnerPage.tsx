@@ -5,6 +5,7 @@ import { LoginPage } from '../auth/LoginPage'
 import { BedGrid } from './BedGrid'
 import { MediaManager } from './MediaManager'
 import { VisitRequests } from './VisitRequests'
+import { TenancyPanel } from './TenancyPanel'
 
 export default function OwnerPage() {
   const [user, setUser] = useState<AuthedUser | null>(currentUser())
@@ -92,7 +93,9 @@ export default function OwnerPage() {
           <AddRoomForm pgId={selected.pg.id} onAdded={(d) => { setSelected(d); void loadPgs() }} />
           <VisitRequests pgId={selected.pg.id} onChanged={() => { void openPg(selected.pg.id); void loadPgs() }} />
           <BedGrid detail={selected} onChanged={() => { void openPg(selected.pg.id); void loadPgs() }} />
+          <TenancyPanel detail={selected} onChanged={() => { void openPg(selected.pg.id); void loadPgs() }} />
           <MediaManager detail={selected} onChanged={() => { void openPg(selected.pg.id) }} />
+          <UpiSetting pg={selected.pg} onChanged={() => void openPg(selected.pg.id)} />
           <StatusToggle pg={selected.pg} onChanged={() => { void openPg(selected.pg.id); void loadPgs() }} />
         </section>
       )}
@@ -296,6 +299,37 @@ function AddRoomForm({ pgId, onAdded }: { pgId: number; onAdded: (d: PgDetail) =
       <label className="field checkbox"><input type="checkbox" name="ac" /><span>AC</span></label>
       <label className="field checkbox"><input type="checkbox" name="attachedBath" /><span>Attached bath</span></label>
       <button type="submit" disabled={busy}>{busy ? 'Adding…' : 'Add room'}</button>
+    </form>
+  )
+}
+
+function UpiSetting({ pg, onChanged }: { pg: Pg; onChanged: () => void }) {
+  const [value, setValue] = useState(pg.upiVpa ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await api.patch(`/pgs/${pg.id}/upi`, { upiVpa: value })
+      onChanged()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="row" onSubmit={save}>
+      <label className="field small">
+        <span>UPI ID for rent reminders</span>
+        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="yourname@bank" />
+      </label>
+      <button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+      {error && <span className="bad">{error}</span>}
     </form>
   )
 }

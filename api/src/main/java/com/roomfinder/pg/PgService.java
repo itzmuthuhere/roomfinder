@@ -67,6 +67,13 @@ public class PgService {
 		return pgs.findById(pgId).orElseThrow();
 	}
 
+	@Transactional
+	public PgView setUpiVpa(AuthedUser user, long pgId, String upiVpa) {
+		requireOwnsPg(user, pgId);
+		pgs.setUpiVpa(pgId, (upiVpa == null || upiVpa.isBlank()) ? null : upiVpa.trim());
+		return pgs.findById(pgId).orElseThrow();
+	}
+
 	/** Shared by every write that touches an existing PG: 404 if it doesn't exist, 403 if it isn't the caller's. */
 	private void requireOwnsPg(AuthedUser user, long pgId) {
 		AuthedUser authed = AuthedUser.require(user);

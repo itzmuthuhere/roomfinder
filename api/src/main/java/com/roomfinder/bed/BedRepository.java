@@ -78,6 +78,14 @@ public class BedRepository {
 		return rows == 1;
 	}
 
+	/** Sets or clears (null) the bed's current occupant, kept in sync with move-in and vacate. */
+	public void setCurrentTenant(long bedId, Long tenantId) {
+		db.sql("update bed set current_tenant_id = :tenantId where id = :id")
+				.param("tenantId", tenantId)
+				.param("id", bedId)
+				.update();
+	}
+
 	public void log(long bedId, BedState from, BedState to, Long actorId, String reason) {
 		db.sql("""
 				insert into bed_state_log (bed_id, from_state, to_state, changed_by, reason)

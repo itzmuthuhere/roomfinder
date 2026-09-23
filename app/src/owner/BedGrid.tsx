@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { api, ApiError, type Bed, type BedState, type PgDetail } from '../lib/api'
 
+// OCCUPIED and ON_NOTICE are deliberately not quick-actions here: moving a tenant in or giving
+// notice needs to create/update a tenancy row too (see the Tenants & rent section below), and a
+// bare state change here would leave that record missing or stale. VACANT/BOOKED -> OCCUPIED and
+// OCCUPIED -> ON_NOTICE both still go through BedService the same way, just via TenancyService.
 const NEXT_STATES: Record<BedState, BedState[]> = {
-  VACANT: ['HELD', 'OCCUPIED', 'BLOCKED'],
+  VACANT: ['HELD', 'BLOCKED'],
   HELD: ['VACANT', 'BOOKED'],
-  BOOKED: ['OCCUPIED', 'VACANT'],
-  OCCUPIED: ['ON_NOTICE', 'VACANT'],
+  BOOKED: ['VACANT'],
+  OCCUPIED: ['VACANT'],
   ON_NOTICE: ['VACANT', 'OCCUPIED'],
   BLOCKED: ['VACANT'],
 }
@@ -68,6 +72,10 @@ export function BedGrid({ detail, onChanged }: { detail: PgDetail; onChanged: ()
                   <span>{LABEL[bed.state]}</span>
                 </div>
                 {bed.availableFrom && <div className="muted">free {bed.availableFrom}</div>}
+                {(bed.state === 'VACANT' || bed.state === 'BOOKED') && (
+                  <div className="muted">Move in a tenant below</div>
+                )}
+                {bed.state === 'OCCUPIED' && <div className="muted">Give notice below</div>}
                 <div className="actions">
                   {NEXT_STATES[bed.state].map((s) => (
                     <button key={s} disabled={busy === bed.id} onClick={() => change(bed, s)}>

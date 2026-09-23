@@ -65,6 +65,16 @@ public class BedService {
 	}
 
 	/**
+	 * A tenancy's notice period runs out: the bed returns to VACANT. Same release semantics as
+	 * {@link #releaseHold} (kept as a separate method so each caller's name says what actually
+	 * happened) - {@code actorId} is null when {@code tenancy.VacateJob} does this automatically.
+	 */
+	@Transactional
+	public BedState endNoticePeriod(long bedId, Long actorId, String reason) {
+		return performTransition(bedId, BedState.VACANT, reason, null, actorId);
+	}
+
+	/**
 	 * The actual state-machine move, shared by every caller above: validate the transition, apply
 	 * the conditional update, write the audit row. No same-state shortcut on purpose - if a bed is
 	 * already HELD, a second seeker asking to hold it must be told no, not quietly told yes.

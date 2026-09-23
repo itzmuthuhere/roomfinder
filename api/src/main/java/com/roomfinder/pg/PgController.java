@@ -46,4 +46,10 @@ public class PgController {
 	                        @PathVariable long pgId, @RequestBody Map<String, String> body) {
 		return service.setStatus(user, pgId, body.getOrDefault("status", "DRAFT"));
 	}
+
+	@PatchMapping("/{pgId}/upi")
+	public PgView setUpiVpa(@RequestAttribute(name = JwtAuthFilter.REQUEST_ATTRIBUTE, required = false) AuthedUser user,
+	                        @PathVariable long pgId, @RequestBody SetUpiRequest req) {
+		return service.setUpiVpa(user, pgId, req.upiVpa());
+	}
 }
