@@ -59,6 +59,21 @@ export type Pg = {
   instantBook: boolean
   totalBeds: number
   vacantBeds: number
+  foodIncluded: boolean | null
+  foodType: string | null
+  noticePeriodDays: number | null
 }
 
 export type PgDetail = { pg: Pg; beds: Bed[]; media: Media[] }
+
+export type SearchResult = {
+  id: number
+  name: string
+  area: string
+  address: string
+  genderType: string
+  coverPhotoUrl: string | null
+  minRentPerBed: number
+  vacantBeds: number
+  distanceKm: number | null
+}

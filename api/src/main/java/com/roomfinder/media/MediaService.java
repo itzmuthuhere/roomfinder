@@ -13,6 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,6 +39,12 @@ public class MediaService {
 
 	public List<MediaView> listForPg(long pgId) {
 		return media.listByPg(pgId).stream().map(this::toView).toList();
+	}
+
+	/** Cover photo URL per PG, for callers (e.g. search) that need one without pulling every photo. PGs with no cover photo are absent from the map. */
+	public Map<Long, String> coverPhotoUrls(List<Long> pgIds) {
+		return media.listCoverPhotos(pgIds).stream()
+				.collect(Collectors.toMap(MediaRow::pgId, row -> storage.publicUrl(row.storageKey())));
 	}
 
 	@Transactional

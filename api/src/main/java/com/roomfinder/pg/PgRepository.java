@@ -97,6 +97,7 @@ public class PgRepository {
 
 	private static final String SELECT_PG = """
 			select p.id, p.name, p.gender_type, p.area, p.address, p.status, p.instant_book,
+			       p.food_included, p.food_type, p.notice_period_days,
 			       count(b.id) as total_beds,
 			       count(b.id) filter (where b.state = 'VACANT') as vacant_beds
 			  from pg_property p
@@ -114,6 +115,9 @@ public class PgRepository {
 				rs.getString("status"),
 				rs.getBoolean("instant_book"),
 				rs.getInt("total_beds"),
-				rs.getInt("vacant_beds"));
+				rs.getInt("vacant_beds"),
+				(Boolean) rs.getObject("food_included"),
+				rs.getString("food_type"),
+				(Integer) rs.getObject("notice_period_days"));
 	}
 }

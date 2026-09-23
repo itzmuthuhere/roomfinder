@@ -66,6 +66,17 @@ class MediaRepository {
 				.optional();
 	}
 
+	/** One row per PG that has a cover photo, for a batch of PGs (e.g. search results). */
+	List<MediaRow> listCoverPhotos(List<Long> pgIds) {
+		if (pgIds.isEmpty()) {
+			return List.of();
+		}
+		return db.sql(SELECT + " where pg_id in (:pgIds) and kind = 'PHOTO' and is_cover")
+				.param("pgIds", pgIds)
+				.query(MediaRepository::map)
+				.list();
+	}
+
 	boolean hasCoverPhoto(long pgId) {
 		return db.sql("select count(*) from media where pg_id = :pgId and kind = 'PHOTO' and is_cover")
 				.param("pgId", pgId)

@@ -35,7 +35,10 @@ public class PgDtos {
 			String status,
 			boolean instantBook,
 			int totalBeds,
-			int vacantBeds) {}
+			int vacantBeds,
+			Boolean foodIncluded,
+			String foodType,
+			Integer noticePeriodDays) {}
 
 	public record PgDetail(PgView pg,
 	                       List<com.roomfinder.bed.BedDtos.BedView> beds,

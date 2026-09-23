@@ -19,14 +19,19 @@ roomfinder/
 │       ├── bed/           BedState machine, BedService, BedRepository, BedController
 │       ├── pg/            PG onboarding: rooms, beds, listing status
 │       ├── media/         photo + video upload, local disk storage, MP4 metadata scrub
+│       ├── search/        GET /api/search: PostGIS radius + filters over LIVE, vacant-bed PGs
 │       └── health/        /api/ping, proves the stack end to end
 └── app/src/
     ├── lib/api.ts         fetch wrapper, types, attaches the bearer token to every call
     ├── lib/auth.ts        OTP request/verify, token storage, decodes the JWT for display only
     ├── lib/upload.ts      XHR upload with progress, canvas downscale, EXIF drop
     ├── auth/              LoginPage (phone → code)
-    └── owner/             OwnerPage, BedGrid, MediaManager
+    ├── owner/             OwnerPage, BedGrid, MediaManager
+    └── seeker/            SearchPage, ListingPage (public, no login)
 ```
+
+App.tsx routes between owner/, seeker/ and login by a plain `window.location.pathname` switch, not
+a router library — three screens, ordinary `<a>` navigation is enough for now (see its comment).
 
 ## Data model (V1 + V2 + V3 migrations)
 
@@ -81,7 +86,9 @@ never be deleted or weakened.
 Owner signs in with a phone number and OTP → creates a PG → adds rooms (beds are created
 automatically) → sees a colour-coded bed grid → changes bed states with audit logging → uploads
 room photos and one walkthrough video → toggles the listing between DRAFT and LIVE. Every write is
-checked against the signed-in owner; another owner's token gets 403, no token gets 401.
+checked against the signed-in owner; another owner's token gets 403, no token gets 401. A stranger
+with no account can search LIVE PGs by area or nearby-me radius, budget, sharing, gender and food/AC,
+and open a listing page with photos, video, room-by-room rent and vacancy.
 
 ## What does not exist yet
 
@@ -89,8 +96,8 @@ checked against the signed-in owner; another owner's token gets 403, no token ge
 but needs a real MSG91 account, DLT template registration, and a live test before `OTP_PROVIDER=msg91`
 can be turned on anywhere. Nothing is deployable until this is done (see BACKLOG.md's Deploy item).
 
-Also missing: seeker search, visit booking with holds and expiry, rent register, notices,
-reviews, the Capacitor mobile wrapper, and any deployment.
+Also missing: visit booking with holds and expiry, rent register, notices, reviews, the Capacitor
+mobile wrapper, and any deployment.
 
 ## Gotchas discovered so far
 
