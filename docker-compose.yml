@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: roomfinder-db
+    environment:
+      POSTGRES_USER: roomfinder
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: roomfinder
+    ports:
+      - "5432:5432"
+    volumes:
+      - roomfinder_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roomfinder"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  roomfinder_pgdata:

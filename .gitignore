@@ -1,0 +1,10 @@
+.env
+*.pem
+*.p12
+*-service-account.json
+api/build/
+api/.gradle/
+app/node_modules/
+app/dist/
+.DS_Store
+data/

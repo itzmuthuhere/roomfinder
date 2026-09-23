@@ -1,0 +1,26 @@
+name: docs-required
+
+# Fails a PR that changes source code without touching docs/.
+# This is the rule that actually keeps documentation current.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Require docs with code changes
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+          CODE=$(git diff --name-only $BASE $HEAD | grep -E '^(api|app)/src/' | wc -l)
+          DOCS=$(git diff --name-only $BASE $HEAD | grep -E '^docs/' | wc -l)
+          echo "code files: $CODE, doc files: $DOCS"
+          if [ "$CODE" -gt 0 ] && [ "$DOCS" -eq 0 ]; then
+            echo "::error::Source changed but no docs updated. Add or update a file under docs/ (feature note, ADR, or runbook)."
+            exit 1
+          fi

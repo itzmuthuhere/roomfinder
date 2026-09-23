@@ -1,0 +1,62 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", "mkdocs.yml", "api/**", ".github/workflows/docs.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: roomfinder
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+
+      # 1. Generate the OpenAPI spec from the running app (springdoc)
+      - name: Generate OpenAPI
+        run: |
+          cd api
+          ./gradlew generateOpenApiDocs   # writes docs/api/openapi.json
+
+      # 2. Generate schema docs from the migrated database (tbls)
+      - name: Migrate and document schema
+        run: |
+          cd api && ./gradlew flywayMigrate
+          curl -sL https://github.com/k1LoW/tbls/releases/latest/download/tbls_linux_amd64.tar.gz | tar xz
+          ./tbls doc "postgres://postgres:postgres@localhost:5432/roomfinder?sslmode=disable" -f ../docs/schema
+
+      # 3. Build the site
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install mkdocs-material
+      - run: mkdocs build --strict
+
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
