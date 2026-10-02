@@ -17,9 +17,17 @@ Product context lives in the Claude project "product"; build rules live in CLAUD
 
 ## Next, in order
 
-### 1. Mobile app wrapper
+### 1. Mobile app wrapper — partial, in progress
 - Capacitor wrap of the same React app, Play Store listing, app icon, splash, push via FCM.
 - Done when: the app installs from a link on your phone.
+- **Done so far:** `app/android/` scaffolded and syncs cleanly (`npm run cap:sync`); push-notification
+  client code wired up (logs the token, doesn't send anywhere yet). See
+  docs/features/2026-09-24-mobile-app-wrapper.md.
+- **Still needed, all manual/hands-on, not more code:** an actual Gradle build (this machine's
+  Gradle has the same JDK bug as the API's — see docs/ARCHITECTURE.md Gotchas — so run
+  `cd app/android && ./gradlew.bat assembleDebug` yourself, or use Android Studio), a signing
+  keystore, a real app icon/splash, a Google Play Developer account (USD 25, a real payment — yours
+  to do), and a Firebase project for real push sending.
 
 ### 2. Deploy
 - One VM in an Indian region, Postgres with nightly backup to R2, GitHub Actions deploy, staging + production.

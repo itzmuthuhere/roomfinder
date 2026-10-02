@@ -25,13 +25,19 @@ roomfinder/
 │       ├── rent/          rent_payment tracking, RentDueJob sweep, mark paid, WhatsApp reminder
 │       ├── notify/        WhatsAppSender interface; LoggingWhatsAppSender is the only sender so far
 │       └── health/        /api/ping, proves the stack end to end
-└── app/src/
-    ├── lib/api.ts         fetch wrapper, types, attaches the bearer token to every call
-    ├── lib/auth.ts        OTP request/verify, token storage, decodes the JWT for display only
-    ├── lib/upload.ts      XHR upload with progress, canvas downscale, EXIF drop
-    ├── auth/              LoginPage (phone → code, parameterised by role)
-    ├── owner/             OwnerPage, BedGrid, MediaManager, VisitRequests, TenancyPanel
-    └── seeker/            SearchPage, ListingPage (+ visit request), MyBookingsPage
+├── app/
+│   ├── capacitor.config.ts  appId com.roomfinder.app, webDir dist
+│   ├── android/             Capacitor-generated native project (its own gitignore/gradlew) - not
+│   │                        yet built; see ARCHITECTURE.md Gotchas and the mobile-wrapper feature note
+│   └── src/
+│       ├── lib/api.ts       fetch wrapper, types, attaches the bearer token to every call
+│       ├── lib/auth.ts      OTP request/verify, token storage, decodes the JWT for display only
+│       ├── lib/upload.ts    XHR upload with progress, canvas downscale, EXIF drop
+│       ├── lib/push.ts      FCM registration (Capacitor push-notifications), no-op in the browser
+│       ├── auth/            LoginPage (phone → code, parameterised by role)
+│       ├── owner/           OwnerPage, BedGrid, MediaManager, VisitRequests, TenancyPanel
+│       └── seeker/          SearchPage, ListingPage (+ visit request), MyBookingsPage
+└── (docs/, api/ as above)
 ```
 
 App.tsx routes between owner/, seeker/ and login by a plain `window.location.pathname` switch, not
@@ -121,8 +127,9 @@ manual account setup (MSG91 + DLT template registration; a Meta Business account
 Nothing is deployable until this is done (see BACKLOG.md's Deploy item).
 
 Also missing: a RESERVE/move-in-reservation booking flow (only VISIT bookings exist — accepting a
-visit does not create a tenancy; an owner still moves a committed tenant in by hand), reviews, the
-Capacitor mobile wrapper, and any deployment.
+visit does not create a tenancy; an owner still moves a committed tenant in by hand), reviews, a
+built/signed Android app (the Capacitor project in `app/android/` is scaffolded and syncs, but has
+never been built or installed - see the mobile-wrapper feature note), and any deployment.
 
 ## Gotchas discovered so far
 

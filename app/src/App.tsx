@@ -3,6 +3,7 @@ import OwnerPage from './owner/OwnerPage'
 import SearchPage from './seeker/SearchPage'
 import ListingPage from './seeker/ListingPage'
 import MyBookingsPage from './seeker/MyBookingsPage'
+import { addPushListeners, registerForPush } from './lib/push'
 
 type Ping = { ok: boolean; beds: number; pgs: number }
 
@@ -37,6 +38,12 @@ export default function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(setPing)
       .catch((e: Error) => setError(e.message))
+  }, [])
+
+  useEffect(() => {
+    // No-op outside a native (Capacitor) build - see lib/push.ts.
+    addPushListeners()
+    void registerForPush()
   }, [])
 
   return (
