@@ -25,7 +25,11 @@ roomfinder/
 │       ├── rent/          rent_payment tracking, RentDueJob sweep, mark paid, WhatsApp reminder
 │       ├── notify/        WhatsAppSender interface; LoggingWhatsAppSender is the only sender so far
 │       └── health/        /api/ping, proves the stack end to end
+├── deploy/                docker-compose.prod.yml, deploy/backup/restore scripts, systemd timers
+│                          (one VM per environment; see docs/ops/deployment.md)
+├── .github/workflows/     ci (PRs), release (main -> images -> staging), deploy (staging/production)
 ├── app/
+│   ├── Dockerfile, Caddyfile  web image: Caddy serves dist/, proxies /api + /media, does HTTPS
 │   ├── capacitor.config.ts  appId com.roomfinder.app, webDir dist
 │   ├── android/             Capacitor-generated native project (its own gitignore/gradlew) - not
 │   │                        yet built; see ARCHITECTURE.md Gotchas and the mobile-wrapper feature note
@@ -129,7 +133,9 @@ Nothing is deployable until this is done (see BACKLOG.md's Deploy item).
 Also missing: a RESERVE/move-in-reservation booking flow (only VISIT bookings exist — accepting a
 visit does not create a tenancy; an owner still moves a committed tenant in by hand), reviews, a
 built/signed Android app (the Capacitor project in `app/android/` is scaffolded and syncs, but has
-never been built or installed - see the mobile-wrapper feature note), and any deployment.
+never been built or installed - see the mobile-wrapper feature note), and a deployment that has
+actually run (the pipeline in `deploy/` and `.github/workflows/` is written and statically checked,
+never run against a real VM - see the deploy-pipeline feature note).
 
 ## Gotchas discovered so far
 

@@ -29,8 +29,13 @@ Product context lives in the Claude project "product"; build rules live in CLAUD
   keystore, a real app icon/splash, a Google Play Developer account (USD 25, a real payment — yours
   to do), and a Firebase project for real push sending.
 
-### 2. Deploy
+### 2. Deploy — partial: files written, never run for real
 - One VM in an Indian region, Postgres with nightly backup to R2, GitHub Actions deploy, staging + production.
+- **Done so far:** Dockerfiles, Caddy, production compose, deploy/backup/restore scripts, systemd
+  timers, CI + release + deploy workflows (all statically validated). See
+  docs/features/2026-10-02-deploy-pipeline.md. **Still needed:** provision a VM and DNS, run
+  `bootstrap-vm.sh`, create `/srv/roomfinder/.env`, set the GitHub Environment secrets, then watch the
+  first release and fix whatever the first real run turns up.
 - Before this: set a real `AUTH_JWT_SECRET` and configure a real `OTP_PROVIDER` (MSG91 account, DLT
   template registration, live phone test), and a real WhatsApp Cloud API sender (Meta Business
   account, verified number, template approval) — all manual, non-code steps. See

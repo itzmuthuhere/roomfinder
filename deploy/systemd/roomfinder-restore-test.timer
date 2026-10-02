@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the RoomFinder restore test on the 1st of each month
+
+[Timer]
+OnCalendar=*-*-01 04:00:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

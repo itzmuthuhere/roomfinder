@@ -1,0 +1,77 @@
+# One stack per VM (staging and production are separate VMs). Config comes from two env files that
+# live on the server, never in git: /srv/roomfinder/.env (secrets, written once by hand) and
+# /srv/roomfinder/.deploy (IMAGE_REPO + IMAGE_TAG, written by deploy.sh on every release).
+# `${VAR:?}` makes a missing required value fail loudly instead of silently falling back to a
+# dev default - the API's dev JWT secret and the log-only OTP sender are both safe locally and
+# wrong anywhere real.
+name: roomfinder
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: roomfinder
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      POSTGRES_DB: roomfinder
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roomfinder -d roomfinder"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  api:
+    image: ${IMAGE_REPO:?}/roomfinder-api:${IMAGE_TAG:?}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/roomfinder
+      DB_USER: roomfinder
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET is required (32+ random bytes)}
+      OTP_PROVIDER: ${OTP_PROVIDER:?OTP_PROVIDER is required (log or msg91)}
+      MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
+      MSG91_TEMPLATE_ID: ${MSG91_TEMPLATE_ID:-}
+      MEDIA_ROOT: /data/media
+    volumes:
+      - ${MEDIA_DIR:-/srv/roomfinder/media}:/data/media
+    healthcheck:
+      # Flyway runs on boot, so give a slow first start room before this counts as failing.
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    logging: *logging
+
+  web:
+    image: ${IMAGE_REPO:?}/roomfinder-web:${IMAGE_TAG:?}
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required (e.g. app.example.com)}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

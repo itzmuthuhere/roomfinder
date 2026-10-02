@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the RoomFinder backup every night
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

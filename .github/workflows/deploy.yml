@@ -1,0 +1,88 @@
+name: deploy
+
+# Deploys an image tag that already exists in GHCR to one environment. Called by release.yml for
+# staging on every merge; run by hand ("Run workflow") to promote a sha to production, or to roll
+# either environment back by passing an older sha - there is no separate rollback mechanism.
+#
+# Required per GitHub Environment (Settings > Environments > staging / production):
+#   secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS
+# Set "required reviewers" on the production environment so a promotion needs an approval click.
+# Application secrets (DB password, JWT secret, SMS keys...) are NOT here: they live in
+# /srv/roomfinder/.env on the VM, so CI can restart the app but can never read its secrets.
+
+on:
+  workflow_call:
+    inputs:
+      environment: { type: string, required: true }
+      image_repo: { type: string, required: true }
+      image_tag: { type: string, required: true }
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Where to deploy
+        type: choice
+        options: [staging, production]
+        required: true
+      image_repo:
+        description: Image repo prefix, e.g. ghcr.io/youruser (lowercase)
+        type: string
+        required: true
+      image_tag:
+        description: Image tag to deploy - a commit sha that has already run on staging
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Pinned host key (not trust-on-first-use): DEPLOY_KNOWN_HOSTS is `ssh-keyscan <host>` run once, by you.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Ship the deploy files
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          scp -i ~/.ssh/id_deploy deploy/docker-compose.prod.yml deploy/*.sh \
+            "$DEPLOY_USER@$DEPLOY_HOST:/srv/roomfinder/"
+
+      - name: Let the VM pull from GHCR
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          # Token goes over stdin, never on a command line.
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+
+      - name: Deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          IMAGE_REPO: ${{ inputs.image_repo }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          ssh -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" \
+            "chmod +x /srv/roomfinder/*.sh && /srv/roomfinder/deploy.sh '$IMAGE_REPO' '$IMAGE_TAG'"

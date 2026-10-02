@@ -1,0 +1,35 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=15552000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Only /api and /media reach the backend. /actuator, /swagger and /v3/api-docs are
+	# deliberately not proxied - they stay reachable only inside the compose network.
+	handle /api/* {
+		request_body {
+			max_size 60MB
+		}
+		reverse_proxy api:8080
+	}
+
+	# Uploaded files get a fresh uuid name every time, so they can be cached forever.
+	handle /media/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy api:8080
+	}
+
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@shell path / /index.html
+		header @shell Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

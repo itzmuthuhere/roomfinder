@@ -1,0 +1,62 @@
+name: release
+
+# Every merge to main: run the full test suite, build the two images once, push them to GHCR tagged
+# with the commit sha, then deploy that exact sha to staging. Production is never built here - it is
+# promoted by hand (deploy.yml, "Run workflow") using a sha that has already been through staging,
+# so what ran on staging is byte-for-byte what goes live.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: gradle }
+      - run: cd api && ./gradlew test --no-daemon
+
+  images:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      repo: ${{ steps.meta.outputs.repo }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: |
+          echo "repo=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push api
+        run: |
+          docker build --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            -t "${{ steps.meta.outputs.repo }}/roomfinder-api:${{ steps.meta.outputs.tag }}" api
+          docker push "${{ steps.meta.outputs.repo }}/roomfinder-api:${{ steps.meta.outputs.tag }}"
+      - name: Build and push web
+        run: |
+          docker build --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}" \
+            -t "${{ steps.meta.outputs.repo }}/roomfinder-web:${{ steps.meta.outputs.tag }}" app
+          docker push "${{ steps.meta.outputs.repo }}/roomfinder-web:${{ steps.meta.outputs.tag }}"
+
+  staging:
+    needs: images
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      image_repo: ${{ needs.images.outputs.repo }}
+      image_tag: ${{ needs.images.outputs.tag }}
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: read

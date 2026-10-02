@@ -43,3 +43,8 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// A fixed name so api/Dockerfile can copy the jar without guessing the version suffix.
+tasks.named('bootJar') {
+	archiveFileName = 'roomfinder-api.jar'
+}
